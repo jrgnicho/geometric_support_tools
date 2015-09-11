@@ -8,7 +8,9 @@
 #include <sstream>
 #include <string.h>
 #include <assert.h>
+#include <cstddef>
 #include <convex_decomposition/vhacd/VHACD.h>
+#include <boost/filesystem.hpp>
 
 using namespace VHACD;
 using namespace std;
@@ -178,18 +180,59 @@ public:
       msg << "+ Generate output: " << nConvexHulls << " convex-hulls " << endl;
       logger_.Log(msg.str().c_str());
       ofstream foutCH(params_.m_fileNameOut.c_str());
+
+      // extraction output name
+      std::size_t pos = params_.m_fileNameOut.rfind("\.");
+      std::string output_dir_path = params_.m_fileNameOut.substr(0,pos);
+
+      pos = output_dir_path.rfind("/");
+      std::string output_name = pos == string::npos ? output_dir_path : output_dir_path.substr(output_dir_path.rfind("/")+1);
+      std::cout<<"CHulls Output Directory "<<output_dir_path<< " and output name is "<<output_name <<std::endl;
+
+      // check for output directory's existance
+      boost::filesystem::path output_dir(output_dir_path);
+      if(!boost::filesystem::exists(output_dir) )
+      {
+        if(boost::filesystem::create_directory(output_dir))
+        {
+          std::cout<<"Output directory "<<output_dir_path<<" was created"<<std::endl;
+        }
+        else
+        {
+          std::cout<<"Output directory "<<output_dir_path<<" could not be created"<<std::endl;
+        }
+      }
+
+
       IVHACD::ConvexHull ch;
       if (foutCH.is_open())
       {
           Material mat;
+
+
+
           for (unsigned int p = 0; p < nConvexHulls; ++p)
           {
+
+
               interfaceVHACD->GetConvexHull(p, ch);
               computeRandomColor(mat);
               saveVRML2(foutCH, ch.m_points, ch.m_triangles, ch.m_nPoints, ch.m_nTriangles, mat, logger_);
               msg.str("");
               msg << "\t CH[" << setfill('0') << setw(5) << p << "] " << ch.m_nPoints << " V, " << ch.m_nTriangles << " T" << endl;
               logger_.Log(msg.str().c_str());
+
+              // create separate file for chull
+              std::stringstream full_chull_path;
+              full_chull_path<<output_dir_path<<"/"<<output_name<<"-chull"<<p+1<<".wrl";
+              ofstream chull_stream(full_chull_path.str().c_str());
+              if(chull_stream.is_open())
+              {
+                saveVRML2(chull_stream, ch.m_points, ch.m_triangles, ch.m_nPoints, ch.m_nTriangles, mat, logger_);
+                chull_stream.close();
+              }
+
+
           }
           foutCH.close();
       }
